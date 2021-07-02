@@ -1,0 +1,90 @@
+library(tidyverse)
+library(httr)
+library(janitor)
+
+```{R}
+contstruct_query <- function(experiment_accession,
+                             base_url = "https://www.encodeproject.org/report.tsv?",
+                             file_format = "fastq",
+                             type = "File",
+                             status = "released",
+                             fields = c("accession", "read_count", "md5sum",
+                                        "controlled_by", "paired_end",
+                                        "paired_with", "replicate", "target")) {
+  query <- paste(list(paste0("type=", type),
+                      paste0("status=", status),
+                      paste0("file_format=", file_format),
+                      paste0("dataset=%2Fexperiments%2F", experiment_accession, "%2F"),
+                      map_chr(fields, ~paste0("field=", .))) %>%
+                   flatten(),
+                 collapse = "&")
+  url <- paste0(base_url, query)
+  return(url)
+}
+encode_file_info <- function(experiment_accession,
+                             base_url = "https://www.encodeproject.org/report.tsv?",
+                             file_format = "fastq",
+                             type = "File",
+                             status = "released",
+                             fields = c("accession", "read_count", "md5sum",
+                                        "controlled_by", "paired_end",
+                                        "paired_with", "replicate", "target")) {
+  path <- "report.tsv?"
+  base_url <- modify_url("https://www.encodeproject.org/", path = path)
+  url <- contstruct_query(experiment_accession,
+                          base_url = base_url,
+                          file_format,
+                          type,
+                          status,
+                          fields)
+  resp <- GET(url)
+  if (http_error(resp)) {
+    error_message <- content(resp, type = "text/html", encoding = "UTF-8") %>%
+      xml_find_all("//p") %>%
+      xml_text() %>%
+      first()
+    stop(
+      sprintf(
+        "ENCODE API request failed [%s]\n%s",
+        status_code(resp),
+        error_message
+      ),
+      call. = FALSE
+    )
+  }
+  if (http_type(resp) != "text/tsv") {
+    stop("API did not return text/tsv", call. = FALSE)
+  }
+  body <- read_tsv(content(resp, "text"), skip = 1) %>%
+    clean_names()
+  return(body)
+}
+####### FUNCTIONS ABOVE, FUN BELOW
+
+input_data <- read.table("experiment_report_2021_6_29_19h_49mfastq.tsv", skip = 1, sep = "\t", header = T)
+acessions <- lapply(input_data$Accession, encode_file_info)
+compiled_files <- bind_rows(acessions)
+
+compiled_files <- mutate(compiled_files, url_to_download = paste0("https://www.encodeproject.org/files/",accession,"/@@download/",accession,".fastq.gz"))
+
+
+download_urls <- dplyr::select(compiled_files, url_to_download) %>%
+  write.table("download_urls.txt", quote = F, sep = " ", col.names = F, row.names = F)
+```
+
+
+
+https://www.encodeproject.org/files/ENCFF212GYT/@@download/ENCFF212GYT.fastq.gz
+
+
+
+
+example_experiment_accession <- "ENCSR590IHT"
+# This will get you the file accession
+example_file_info <- encode_file_info(example_experiment_accession)
+# You can then construct urls for these files using this example
+# https://www.encodeproject.org/files/ENCFF212GYT/@@download/ENCFF212GYT.fastq.gz
+# We'll do that here
+example_file_info <- example_file_info %>%
+  mutate(url_to_download = paste0("https://www.encodeproject.org/files/",accession,"/@@download/",accession,".fastq.gz"))
+example_file_info$url_to_download[[1]]
