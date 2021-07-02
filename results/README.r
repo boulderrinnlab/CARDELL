@@ -1,0 +1,1 @@
+here is where we will keep the output from nextflow pipelines
