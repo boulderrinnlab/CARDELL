@@ -1,8 +1,16 @@
+---
+title: "Acquiring data"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{R}
+options(stringsAsFactors = FALSE)
 library(tidyverse)
 library(httr)
 library(janitor)
 
-```{R}
 contstruct_query <- function(experiment_accession,
                              base_url = "https://www.encodeproject.org/report.tsv?",
                              file_format = "fastq",
@@ -61,11 +69,13 @@ encode_file_info <- function(experiment_accession,
 }
 ####### FUNCTIONS ABOVE, FUN BELOW
 
-input_data <- read.table("experiment_report_2021_6_29_19h_49mfastq.tsv", skip = 1, sep = "\t", header = T)
+input_data <- read.table("/scratch/Shares/rinn/isabela/CARDELL/data/chipseq_fastq/experiment_report_2021_6_29_19h_49mfastq.tsv", skip = 1, sep = "\t", header = T)
 acessions <- lapply(input_data$Accession, encode_file_info)
 compiled_files <- bind_rows(acessions)
 
 compiled_files <- mutate(compiled_files, url_to_download = paste0("https://www.encodeproject.org/files/",accession,"/@@download/",accession,".fastq.gz"))
+
+write_csv(compiled_files, "results/fastq_file_info.csv")
 
 
 download_urls <- dplyr::select(compiled_files, url_to_download) %>%
