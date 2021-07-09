@@ -7,6 +7,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
+options(stringsAsFactors = F)
 knitr::opts_chunk$set(echo = TRUE)
 library(ENCODExplorer)
 library(tidyverse)
@@ -14,11 +15,12 @@ library(janitor)
 library(httr)
 ```
 
+# Url to retrieve all the samples from encode
 
-```{r}
 # Retrieve encode sample report here:
+
 https://www.encodeproject.org/report/?type=Experiment&status=released&replicates.library.biosample.donor.organism.scientific_name=Homo+sapiens&biosample_ontology.term_name=heart+right+ventricle&biosample_ontology.term_name=heart&biosample_ontology.term_name=heart+left+ventricle&assay_slims=DNA+binding&biosample_ontology.term_name=mesodermal+cell&biosample_ontology.term_name=cardiovascular+progenitor+cell&biosample_ontology.term_name=cardiac+myoblast&biosample_ontology.term_name=cardiac+muscle+cell&biosample_ontology.classification!=primary+cell&biosample_ontology.term_name=H7&assay_slims=Transcription&assay_title!=RAMPAGE&assay_title!=RNA+microarray&assay_title!=microRNA-seq&assay_title!=microRNA+counts&assay_title!=small+RNA-seq&assay_title!=long+read+RNA-seq&assay_slims=DNA+accessibility&assay_title!=DNase-seq&assay_title!=ATAC-seq&assay_title!=total+RNA-seq&assay_title!=polyA+plus+RNA-seq
-```
+
 
 # Running functions to get fastq info
 ```{R}
@@ -80,19 +82,13 @@ encode_file_info <- function(experiment_accession,
 }
 ```
 
-
-
-
-
-
-```
 # Read in the experiment report downloaded from Encode
 # we will only use the Accession column 
 # Here we'll retrieve the read_count and md5 sum 
 # as well as the file accession (with some other metadata)
 # for the fastq files associated with each experiment.
 
-
+```{r}
 fastq_info <- read.table("experiment_report_2021_6_29_19h_49mfastq.tsv",
                         skip = 1, sep = "\t", header = T) %>%
   dplyr::select(Accession) %>%
@@ -113,10 +109,12 @@ md5_txt <- fastq_info %>%
 write.table(md5_txt, "md5.txt", sep = "  ", quote = FALSE, row.names = FALSE, col.names = FALSE)
 ```
 
+
+
 Awesome now we have a text file of encode file names and md5sum.
 Let's run the md5sum test using -c to check a list and print the output to md5_status.txt
 
-```
+```{bash}
 md5sum -c md5.txt 
 #To output do the following in the directory with files to be tested
 md5sum -c md5.txt > md5_status.txt
@@ -129,8 +127,6 @@ First we need to install "janitor"
 
 Here we are going to use our ENCODE.TSV report to make a design file for 
 Nextflow ChiP-seeker. You will need the report file that can be downloaded here:
-
-https://www.encodeproject.org/report/?type=Experiment&status=released&assay_slims=DNA+binding&biosample_ontology.term_name=HepG2&assay_title=TF+ChIP-seq&biosample_ontology.classification=cell+line&files.read_length=100&files.read_length=76&files.read_length=75&files.read_length=36&assay_title=Control+ChIP-seq&assay_title=Histone+ChIP-seq&files.run_type=single-ended
 
 Notice that the URL is very similar to the structure of the data file.
 
@@ -220,35 +216,66 @@ file names with gsub. So the first part is just cleaning the naming we made abov
 # TODO # I think this is the new way of making the batch design files. So together
 with chunk above maybe all we need.
 
+# We are getting some biosample informatio to maybe merge on later
+
 ```{r}
-fastq_info$fastq_1 <- paste0("../fastq/", fastq_info$file_accession, ".fastq.gz")
-fastq_info$file_control <- gsub("/", "", gsub("/files/", "", fastq_info$controlled_by))
-fastq_info$fastq_2 <- ""
-fastq_info$antibody <- gsub("-human", "", gsub("/", "", gsub("/targets/", "", fastq_info$target)))
-fastq_info$group <- fastq_info$antibody
-contrls <- fastq_info %>% filter(is.na(file_control))
+meta_data <- read.table("experiment_report_2021_6_29_19h_49mfastq.tsv",
+                        skip = 1, sep = "\t", header = T)
+
+meta_data_merge <- dplyr::select(meta_data, Controls, Accession, Biosample.summary, Biosample.term.name) %>%
+  mutate(biosample = gsub(" ", "_", Biosample.summary), biosample = gsub("\\(|\\)", "", biosample)) %>%
+  mutate(biosample_term = gsub(" ", "_", Biosample.term.name)) %>%
+  dplyr::select(Controls, biosample, biosample_term, Accession) %>% 
+  dplyr::rename(experiment_accession = Accession) 
+
+
+fastq_info_merged <- merge(fastq_info, meta_data_merge)
+```
+
+## Starting to make design file
+#TODO: check to see if the controls are comming down from encode API
+```{r}
+fastq_info_merged$fastq_1 <- paste0("../../data/chipseq_fastq/", fastq_info_merged$file_accession, ".fastq.gz")
+fastq_info_merged$Controls <- gsub("/", "", gsub("/experiments/", "", fastq_info_merged$controlled_by))
+fastq_info_merged$fastq_2 <- ""
+fastq_info_merged$antibody <- gsub("-human", "", gsub("/", "", gsub("/targets/", "", fastq_info_merged$target)))
+
+fastq_info_merged <- fastq_info_merged %>%
+  unite(group, antibody, biosample, sep = ".", remove = F)
+
+
+contrls <- fastq_info_merged %>% filter(is.na(Controls))
 contrls$group <- contrls$experiment_accession
-control2exp <- fastq_info %>% 
+
+control2exp <- fastq_info_merged %>% 
   ungroup() %>% 
   dplyr::select(file_control) %>%
   distinct() %>%
   filter(!is.na(file_control)) %>%
   separate(file_control, into = c("one_control"), sep = ",", remove = FALSE)
+
+
+
 ctrl2exp <- contrls %>%
 ungroup() %>% 
   dplyr::select(experiment_accession, file_accession) %>%
   dplyr::rename(one_control = file_accession)
 control2exp <- merge(control2exp, ctrl2exp)
+
 control2exp <- control2exp %>%
   dplyr::select(-one_control) %>%
   dplyr::rename(control = experiment_accession)
-fastq_info <- merge(fastq_info, control2exp, all.x = T)
-fastq_info[is.na(fastq_info$controlled_by), "group"] <- fastq_info[is.na(fastq_info$controlled_by), "experiment_accession"]
-fastq_info <- fastq_info %>% 
+fastq_info_merged <- merge(fastq_info_merged, control2exp, all.x = T)
+fastq_info_merged[is.na(fastq_info_merged$controlled_by), "group"] <- fastq_info_merged[is.na(fastq_info_merged$controlled_by), "experiment_accession"]
+
+
+fastq_info_merged <- fastq_info_merged %>% 
   group_by(group) %>%
   mutate(replicate = 1:n())
-design <- fastq_info %>%
+design <- fastq_info_merged %>%
   dplyr::select(group, replicate, fastq_1, fastq_2, antibody, control)
+
+
 experiments <- design %>% 
   filter(!is.na(control)) %>%
   dplyr::select(group) %>%
