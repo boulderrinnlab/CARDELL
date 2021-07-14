@@ -15,11 +15,38 @@ library(janitor)
 library(httr)
 ```
 
-# Url to retrieve all the samples from encode
 
 # Retrieve encode sample report here:
 
 https://www.encodeproject.org/report/?type=Experiment&status=released&replicates.library.biosample.donor.organism.scientific_name=Homo+sapiens&biosample_ontology.term_name=heart+right+ventricle&biosample_ontology.term_name=heart&biosample_ontology.term_name=heart+left+ventricle&assay_slims=DNA+binding&biosample_ontology.term_name=mesodermal+cell&biosample_ontology.term_name=cardiovascular+progenitor+cell&biosample_ontology.term_name=cardiac+myoblast&biosample_ontology.term_name=cardiac+muscle+cell&biosample_ontology.classification!=primary+cell&biosample_ontology.term_name=H7&assay_slims=Transcription&assay_title!=RAMPAGE&assay_title!=RNA+microarray&assay_title!=microRNA-seq&assay_title!=microRNA+counts&assay_title!=small+RNA-seq&assay_title!=long+read+RNA-seq&assay_slims=DNA+accessibility&assay_title!=DNase-seq&assay_title!=ATAC-seq&assay_title!=total+RNA-seq&assay_title!=polyA+plus+RNA-seq
+
+
+Here we are going to use our ENCODE.TSV report to make a design file for 
+Nextflow ChiP-seeker. 
+
+For the input design file Nextflow needs a few things:
+
+group	replicate	fastq	antibody	control
+
+* group is the DBP and controls listed individually
+* replicate indicates which replicate of the given DBP 
+* Antibody same for all DBPs but input controls are blank
+* Control tells which "group" are the inputs.
+
+
+Now we start the hard part of coding such a simple sounding design file :)
+
+
+We are going to use the ENCODE API instead of the web interface. Some information
+cannot be retrieved such as MD5sum and other aspects in the .TSV
+
+You can see all the information you can gather using the API and what the code
+would look like here:
+
+https://app.swaggerhub.com/apis-docs/encodeproject/api/basic_search#/Experiment
+
+Notice the URL produced above has a lot of the information -- so we can use the 
+API to tell it exactly what we want in code rather than clicking buttons --
 
 
 # Running functions to get fastq info
@@ -80,6 +107,12 @@ encode_file_info <- function(experiment_accession,
     clean_names()
   return(body)
 }
+
+get_fastq_info <- function(experiment_accession) {
+  request <- GET(contstruct_query(experiment_accession)) 
+  body <- read_tsv(content(request, "text"), skip = 1)
+  return(body)
+}
 ```
 
 # Read in the experiment report downloaded from Encode
@@ -121,102 +154,9 @@ md5sum -c md5.txt > md5_status.txt
 ```
 
 
-TODO : Decide on fastQ merge as next step -- explore the table in excel to get a feel?
-
-First we need to install "janitor"
-
-Here we are going to use our ENCODE.TSV report to make a design file for 
-Nextflow ChiP-seeker. You will need the report file that can be downloaded here:
-
-Notice that the URL is very similar to the structure of the data file.
-
-For the input design file Nextflow needs a few things:
-
-group	replicate	fastq	antibody	control
-
-* group is the DBP and controls listed individually
-* replicate indicates which replicate of the given DBP 
-* Antibody same for all DBPs but input controls are blank
-* Control tells which "group" are the inputs.
 
 
-Now we start the hard part of coding such a simple sounding design file :)
-
-
-We are going to use the ENCODE API instead of the web interface. Some information
-cannot be retrieved such as MD5sum and other aspects in the .TSV
-
-You can see all the information you can gather using the API and what the code
-would look like here:
-
-https://app.swaggerhub.com/apis-docs/encodeproject/api/basic_search#/Experiment
-
-Notice the URL produced above has a lot of the information -- so we can use the 
-API to tell it exactly what we want in code rather than clicking buttons --
-
-
-First let's make a table with the 
-```{r}
-# write_csv(design, "design_full_file")
-## Grabbing some handy environment variables to .CSV :)
-contstruct_query <- function(experiment_accession,
-                             base_url = "https://www.encodeproject.org/report.tsv?",
-                             file_format = "fastq",
-                             type = "File", 
-                             status = "released",
-                             fields = c("accession", "read_count", "md5sum",
-                                        "controlled_by", "paired_end",
-                                        "paired_with", "replicate", "target")) {
-  query <- paste(list(paste0("type=", type), 
-        paste0("status=", status),
-        paste0("file_format=", file_format),
-        paste0("dataset=%2Fexperiments%2F", experiment_accession, "%2F"),
-        map_chr(fields, ~paste0("field=", .))) %>%
-          flatten(),
-       collapse = "&")
-  url <- paste0(base_url, query)
-  return(url)
-}
-get_fastq_info <- function(experiment_accession) {
-  request <- GET(contstruct_query(experiment_accession)) 
-  body <- read_tsv(content(request, "text"), skip = 1)
-  return(body)
-}
-# Read in the experiment report downloaded from Encode
-# we will only use the Accession column 
-# Here we'll retrieve the read_count and md5 sum 
-# as well as the file accession (with some other metadata)
-# for the fastq files associated with each experiment.
-unique(missing_control_file)
-# We can do another encode query to get the experiment control_type
-# if we query experiments instead of files.
-experiment_report <- read.table("data/Best_class_full_controls.tsv",
-                        skip = 1, sep = "\t", header = T)
-fastq_info <- data.frame(experiment_accession = c(experiment_report$Accession, c("ENCSR000EVT",
-                                                                                 "ENCSR945JOR",
-                                                                                 "ENCSR476TKW",
-                                                                                 "ENCSR770PLF"))) %>%
-  distinct() %>%
-  mutate(fastq_info = map(experiment_accession, ~get_fastq_info(.))) %>%
-  unnest(fastq_info) %>%
-  dplyr::rename(file_accession = Accession) %>%
-  clean_names()
-write_csv(fastq_info, "final_files_md5sum.csv")
-fastq_info <- read_csv("final_files_md5sum.csv")
-```
-
-
-
-Now that we have all the information we want in tables above we can tidy up
-file names with gsub. So the first part is just cleaning the naming we made above
-?gsub
-
-
-
-# TODO # I think this is the new way of making the batch design files. So together
-with chunk above maybe all we need.
-
-# We are getting some biosample informatio to maybe merge on later
+# We are getting some biosample information to maybe merge on later
 
 ```{r}
 meta_data <- read.table("experiment_report_2021_6_29_19h_49mfastq.tsv",
@@ -233,10 +173,10 @@ fastq_info_merged <- merge(fastq_info, meta_data_merge)
 ```
 
 ## Starting to make design file
-#TODO: check to see if the controls are comming down from encode API
+#TODO: check to see if the controls are comming down from encode API - it's not, so we'll grab them from the .tsv file in Controls column
 ```{r}
 fastq_info_merged$fastq_1 <- paste0("../../data/chipseq_fastq/", fastq_info_merged$file_accession, ".fastq.gz")
-fastq_info_merged$Controls <- gsub("/", "", gsub("/experiments/", "", fastq_info_merged$controlled_by))
+fastq_info_merged$control <- gsub("/", "", gsub("/experiments/", "", fastq_info_merged$Controls))
 fastq_info_merged$fastq_2 <- ""
 fastq_info_merged$antibody <- gsub("-human", "", gsub("/", "", gsub("/targets/", "", fastq_info_merged$target)))
 
@@ -244,16 +184,42 @@ fastq_info_merged <- fastq_info_merged %>%
   unite(group, antibody, biosample, sep = ".", remove = F)
 
 
-contrls <- fastq_info_merged %>% filter(is.na(Controls))
+contrls <- fastq_info_merged %>% filter(Controls == "")
+
 contrls$group <- contrls$experiment_accession
 
-control2exp <- fastq_info_merged %>% 
+#Choose just one file for each input control. Exclude replicates by experiment_accession column 
+contrls_unique <- contrls[!duplicated(contrls$experiment_accession), ]
+
+samples <- fastq_info_merged %>% filter(Controls != "")
+fastq_final <- rbind(contrls_unique, samples)
+
+fastq_final <- fastq_final %>% 
+  group_by(group) %>%
+  mutate(replicate = 1:n())
+design <- fastq_final %>%
+  dplyr::select(group, replicate, fastq_1, fastq_2, antibody, control)
+
+write_csv(design, "design.csv")
+```
+
+#Question: It's not considering the isogenic replicates, only technical, should we discriminate that? 
+
+#Why keep just one control replicate?
+The control column should be the group identifier for the controls for any given IP. The pipeline will automatically pair the inputs based on replicate identifier (i.e. where you have an equal number of replicates for your IP's and controls), alternatively, the first control sample in that group will be selected.
+
+#I want to exclude this ENCSR842VGU
+# maybe exclude these: ENCFF918EVM, ENCFF741BSF, ENCFF255JSS (failed, didnt match with replicates, same input control); ENCFF962AHN, ENCFF044YWU,ENCFF794RCZ, ENCFF523UYJ, ENCFF205RPZ, ENCFF435KUB, ENCFF632WAT, ENCFF254TVF (paired, read 2)
+#change ENCFF886BMC (read2) for ENCFF633HXG (read1) at control ENCSR689CZH
+
+```{r}
+# I didn't use this
+##control2exp <- fastq_info_merged %>% 
   ungroup() %>% 
   dplyr::select(file_control) %>%
   distinct() %>%
   filter(!is.na(file_control)) %>%
   separate(file_control, into = c("one_control"), sep = ",", remove = FALSE)
-
 
 
 ctrl2exp <- contrls %>%
@@ -267,14 +233,12 @@ control2exp <- control2exp %>%
   dplyr::rename(control = experiment_accession)
 fastq_info_merged <- merge(fastq_info_merged, control2exp, all.x = T)
 fastq_info_merged[is.na(fastq_info_merged$controlled_by), "group"] <- fastq_info_merged[is.na(fastq_info_merged$controlled_by), "experiment_accession"]
+###until here
+```
 
 
-fastq_info_merged <- fastq_info_merged %>% 
-  group_by(group) %>%
-  mutate(replicate = 1:n())
-design <- fastq_info_merged %>%
-  dplyr::select(group, replicate, fastq_1, fastq_2, antibody, control)
-
+#Stop here
+```{r}
 
 experiments <- design %>% 
   filter(!is.na(control)) %>%
