@@ -201,6 +201,14 @@ design <- fastq_final %>%
   dplyr::select(group, replicate, fastq_1, fastq_2, antibody, control)
 
 write_csv(design, "design.csv")
+
+
+design_final <- read_csv("design_final.csv")
+design_final <- gsub("NA", "", design_final)
+
+write_csv(design_final, "design_final.csv")
+
+
 ```
 
 #Question: It's not considering the isogenic replicates, only technical, should we discriminate that? (10 replicates mean 5 technical replicates of 2 distinct isogenic samples)
