@@ -203,7 +203,7 @@ design <- fastq_final %>%
 write_csv(design, "design.csv")
 ```
 
-#Question: It's not considering the isogenic replicates, only technical, should we discriminate that? 
+#Question: It's not considering the isogenic replicates, only technical, should we discriminate that? (10 replicates mean 5 technical replicates of 2 distinct isogenic samples)
 
 #Why keep just one control replicate?
 The control column should be the group identifier for the controls for any given IP. The pipeline will automatically pair the inputs based on replicate identifier (i.e. where you have an equal number of replicates for your IP's and controls), alternatively, the first control sample in that group will be selected.
