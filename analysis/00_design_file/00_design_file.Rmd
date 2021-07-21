@@ -202,22 +202,23 @@ design <- fastq_final %>%
 
 write_csv(design, "design.csv")
 
+#I excluded some samples/files using excel
+#antibody for controls have NA, correct that:
 
 design_final <- read_csv("design_final.csv")
-design_final <- gsub("NA", "", design_final)
+design_final$antibody <- gsub("NA", " ", design_final$antibody)
 
-write_csv(design_final, "design_final.csv")
-
+write_csv(design_final, "design_final2.csv")
+##it didn't work!!
 
 ```
 
-#Question: It's not considering the isogenic replicates, only technical, should we discriminate that? (10 replicates mean 5 technical replicates of 2 distinct isogenic samples)
 
 #Why keep just one control replicate?
 The control column should be the group identifier for the controls for any given IP. The pipeline will automatically pair the inputs based on replicate identifier (i.e. where you have an equal number of replicates for your IP's and controls), alternatively, the first control sample in that group will be selected.
 
-#I want to exclude this ENCSR842VGU
-# maybe exclude these: ENCFF918EVM, ENCFF741BSF, ENCFF255JSS (failed, didnt match with replicates, same input control); ENCFF962AHN, ENCFF044YWU,ENCFF794RCZ, ENCFF523UYJ, ENCFF205RPZ, ENCFF435KUB, ENCFF632WAT, ENCFF254TVF (paired, read 2)
+#Excluded samples/files: ENCSR842VGU
+# also: ENCFF918EVM, ENCFF741BSF, ENCFF255JSS (failed, didnt match with replicates, same input control); ENCFF962AHN, ENCFF044YWU,ENCFF794RCZ, ENCFF523UYJ, ENCFF205RPZ, ENCFF435KUB, ENCFF632WAT, ENCFF254TVF (paired, read 2)
 #change ENCFF886BMC (read2) for ENCFF633HXG (read1) at control ENCSR689CZH
 
 ```{r}
