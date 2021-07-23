@@ -9,7 +9,6 @@ editor_options:
 ```{r setup, include=FALSE}
 options(stringsAsFactors = F)
 knitr::opts_chunk$set(echo = TRUE)
-library(ENCODExplorer)
 library(tidyverse)
 library(janitor)
 library(httr)
@@ -206,10 +205,17 @@ write_csv(design, "design.csv")
 #antibody for controls have NA, correct that:
 
 design_final <- read_csv("design_final.csv")
-design_final$antibody <- gsub("NA", " ", design_final$antibody)
 
-write_csv(design_final, "design_final2.csv")
-##it didn't work!!
+design_final$fastq_2 <- as.character(design_final$fastq_2)
+
+design_final[is.na(design_final)] <- ""
+
+design_final$group <- gsub(",", "", design_final$group)
+
+design_final$fastq_1 <- gsub("../../","../", design_final$fastq_1)
+
+write_csv(design_final, "design_final.csv")
+
 
 ```
 
@@ -220,58 +226,4 @@ The control column should be the group identifier for the controls for any given
 #Excluded samples/files: ENCSR842VGU
 # also: ENCFF918EVM, ENCFF741BSF, ENCFF255JSS (failed, didnt match with replicates, same input control); ENCFF962AHN, ENCFF044YWU,ENCFF794RCZ, ENCFF523UYJ, ENCFF205RPZ, ENCFF435KUB, ENCFF632WAT, ENCFF254TVF (paired, read 2)
 #change ENCFF886BMC (read2) for ENCFF633HXG (read1) at control ENCSR689CZH
-
-```{r}
-# I didn't use this
-##control2exp <- fastq_info_merged %>% 
-  ungroup() %>% 
-  dplyr::select(file_control) %>%
-  distinct() %>%
-  filter(!is.na(file_control)) %>%
-  separate(file_control, into = c("one_control"), sep = ",", remove = FALSE)
-
-
-ctrl2exp <- contrls %>%
-ungroup() %>% 
-  dplyr::select(experiment_accession, file_accession) %>%
-  dplyr::rename(one_control = file_accession)
-control2exp <- merge(control2exp, ctrl2exp)
-
-control2exp <- control2exp %>%
-  dplyr::select(-one_control) %>%
-  dplyr::rename(control = experiment_accession)
-fastq_info_merged <- merge(fastq_info_merged, control2exp, all.x = T)
-fastq_info_merged[is.na(fastq_info_merged$controlled_by), "group"] <- fastq_info_merged[is.na(fastq_info_merged$controlled_by), "experiment_accession"]
-###until here
-```
-
-
-#Stop here
-```{r}
-
-experiments <- design %>% 
-  filter(!is.na(control)) %>%
-  dplyr::select(group) %>%
-  distinct() 
-experiments$exp_num <- 1:nrow(experiments)
-experiments$batch <- as.numeric(cut_number(experiments$exp_num, n = 6))
-experiments <- experiments %>% dplyr::select(group, batch) %>%
-  as.data.frame()
-design <- merge(design, experiments, all.x = T)
-batches <- design %>%
-  group_by(batch) %>%
-  group_split()
-controls <- batches[[7]]
-for (i in 1:6) {
-  batch <- batches[[i]]
-  ctrl_batch <- controls[controls$group %in% batch$control,]
-  batch <- bind_rows(ctrl_batch, batch)
-  # Change the NAs to ""
-  batch[is.na(batch$antibody),"antibody"] <- ""
-  batch[is.na(batch$control),"control"] <- ""
-  # Get rid of batch col
-  batch <- batch %>% dplyr::select(-batch)
-  dir.create(paste0("data/test_work/batch_",i))
-  write_csv(batch, paste0("data/test_work/batch_",i,"/design_",i,".csv"))
-}
-```
+#excluded ENCSR554RPI (input) and all its samples
