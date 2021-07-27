@@ -206,13 +206,21 @@ write_csv(design, "design.csv")
 
 design_final <- read_csv("design_final.csv")
 
-design_final$fastq_2 <- as.character(design_final$fastq_2)
+design_final$fastq_2 <- ""
 
 design_final[is.na(design_final)] <- ""
 
-design_final$group <- gsub(",", "", design_final$group)
+#design_final$group <- gsub(",", "", design_final$group)
 
-design_final$fastq_1 <- gsub("../../","../", design_final$fastq_1)
+#design_final$fastq_1 <- gsub("../../","../", design_final$fastq_1)
+
+design_final$group <- gsub("treated_with(.*)_Activin_A", "", design_final$group)
+
+design_final$group <- gsub("Bone_morphogenetic_protein", "BMP", design_final$group)
+design_final$group <- gsub("10_ng/mL", "", design_final$group)
+
+#ENCSR554RPI: removed because it's private in ENCODE and we don;t have access.
+design_final <- design_final %>% filter(control != "ENCSR554RPI", group != "ENCSR554RPI")
 
 write_csv(design_final, "design_final.csv")
 
