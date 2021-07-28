@@ -222,6 +222,13 @@ design_final$group <- gsub("10_ng/mL", "", design_final$group)
 #ENCSR554RPI: removed because it's private in ENCODE and we don;t have access.
 design_final <- design_final %>% filter(control != "ENCSR554RPI", group != "ENCSR554RPI")
 
+#remove ENCFF001EZO and ENCFF001EZR because it could't find peaks
+design_final <- design_final %>% filter(fastq_1 != "../data/chipseq_fastq/ENCFF001EZO.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF001EZR.fastq.gz")
+
+design_final <- design_final %>% 
+  group_by(group) %>%
+  mutate(replicate = 1:n())
+
 write_csv(design_final, "design_final.csv")
 
 
