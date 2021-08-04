@@ -27,9 +27,9 @@ For the input design file Nextflow needs a few things:
 
 group	replicate	fastq	antibody	control
 
-* group is the DBP and controls listed individually
-* replicate indicates which replicate of the given DBP 
-* Antibody same for all DBPs but input controls are blank
+* group is the sample name and controls listed individually
+* replicate indicates which replicate of the given sample 
+* Antibody same for each IP, but input controls are blank
 * Control tells which "group" are the inputs.
 
 
@@ -155,7 +155,7 @@ md5sum -c md5.txt > md5_status.txt
 
 
 
-# We are getting some biosample information to maybe merge on later
+# We are getting some more biosample information 
 
 ```{r}
 meta_data <- read.table("experiment_report_2021_6_29_19h_49mfastq.tsv",
@@ -172,7 +172,7 @@ fastq_info_merged <- merge(fastq_info, meta_data_merge)
 ```
 
 ## Starting to make design file
-#TODO: check to see if the controls are comming down from encode API - it's not, so we'll grab them from the .tsv file in Controls column
+#TODO: check to see if the controls are comming down from encode API - here it's not, so we'll grab them from the .tsv file in Controls column
 ```{r}
 fastq_info_merged$fastq_1 <- paste0("../../data/chipseq_fastq/", fastq_info_merged$file_accession, ".fastq.gz")
 fastq_info_merged$control <- gsub("/", "", gsub("/experiments/", "", fastq_info_merged$Controls))
@@ -196,40 +196,45 @@ fastq_final <- rbind(contrls_unique, samples)
 fastq_final <- fastq_final %>% 
   group_by(group) %>%
   mutate(replicate = 1:n())
+
 design <- fastq_final %>%
   dplyr::select(group, replicate, fastq_1, fastq_2, antibody, control)
 
-write_csv(design, "design.csv")
+#write_csv(design, "design.csv")
+#design <- read_csv("design.csv")
 
-#I excluded some samples/files using excel
-#antibody for controls have NA, correct that:
+#some corrections:
 
-design_final <- read_csv("design_final.csv")
+design$fastq_1 <- gsub("../../","../", design$fastq_1)
 
-design_final$fastq_2 <- ""
+design$group <- gsub(",", "", design$group)
+design$group <- gsub("treated_with(.*)_Activin_A", "", design$group)
+design$group <- gsub("Bone_morphogenetic_protein", "BMP", design$group)
+design$group <- gsub("10_ng/mL", "", design$group)
 
-design_final[is.na(design_final)] <- ""
+#ENCSR554RPI: removed because it's private in ENCODE and we don't have access.
+design <- design %>% filter(control != "ENCSR554RPI", group != "ENCSR554RPI")
 
-#design_final$group <- gsub(",", "", design_final$group)
-
-#design_final$fastq_1 <- gsub("../../","../", design_final$fastq_1)
-
-design_final$group <- gsub("treated_with(.*)_Activin_A", "", design_final$group)
-
-design_final$group <- gsub("Bone_morphogenetic_protein", "BMP", design_final$group)
-design_final$group <- gsub("10_ng/mL", "", design_final$group)
-
-#ENCSR554RPI: removed because it's private in ENCODE and we don;t have access.
-design_final <- design_final %>% filter(control != "ENCSR554RPI", group != "ENCSR554RPI")
+design <- design %>% filter(group != "ENCSR842VGU")
 
 #remove ENCFF001EZO and ENCFF001EZR because it could't find peaks
-design_final <- design_final %>% filter(fastq_1 != "../data/chipseq_fastq/ENCFF001EZO.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF001EZR.fastq.gz")
+design <- design %>% filter(fastq_1 != "../data/chipseq_fastq/ENCFF001EZO.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF001EZR.fastq.gz")
 
-design_final <- design_final %>% 
+#remove because fastq failed and didn't match samples or are paired_end read2
+design <- design %>% filter(fastq_1 != "../data/chipseq_fastq/ENCFF918EVM.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF741BSF.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF255JSS.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF741BSF.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF962AHN.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF044YWU.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF794RCZ.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF523UYJ.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF205RPZ.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF435KUB.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF632WAT.fastq.gz", fastq_1 != "../data/chipseq_fastq/ENCFF254TVF.fastq.gz")  
+
+design$fastq_1 <- gsub("ENCFF886BMC", "ENCFF633HXG", design$fastq_1)
+
+#adjust replicate numbers
+design <- design %>% 
   group_by(group) %>%
   mutate(replicate = 1:n())
 
-write_csv(design_final, "design_final.csv")
+#remove NAs
+design$fastq_2 <- ""
+design[is.na(design)] <- ""
+
+write_csv(design, "design_final.csv")
 
 
 ```
@@ -238,7 +243,7 @@ write_csv(design_final, "design_final.csv")
 #Why keep just one control replicate?
 The control column should be the group identifier for the controls for any given IP. The pipeline will automatically pair the inputs based on replicate identifier (i.e. where you have an equal number of replicates for your IP's and controls), alternatively, the first control sample in that group will be selected.
 
-#Excluded samples/files: ENCSR842VGU
+#Excluded samples/files: ENCSR842VGU (only input with no samples)
 # also: ENCFF918EVM, ENCFF741BSF, ENCFF255JSS (failed, didnt match with replicates, same input control); ENCFF962AHN, ENCFF044YWU,ENCFF794RCZ, ENCFF523UYJ, ENCFF205RPZ, ENCFF435KUB, ENCFF632WAT, ENCFF254TVF (paired, read 2)
 #change ENCFF886BMC (read2) for ENCFF633HXG (read1) at control ENCSR689CZH
-#excluded ENCSR554RPI (input) and all its samples
+
