@@ -25,7 +25,7 @@ May your attention to file paths serve you well !
 consensus_peaks <- create_consensus_peaks("/scratch/Shares/rinn/isabela/CARDELL/results/results/bwa/mergedLibrary/macs/broadPeak")
 for(i in 1:length(consensus_peaks)) {
   rtracklayer::export(consensus_peaks[[i]], 
-                      paste0("/scratch/Shares/rinn/isabela/CARDELL/analysis/00_consensuspeaks/consensus_peaks", 
+                      paste0("/scratch/Shares/rinn/isabela/CARDELL/analysis/00_consensuspeaks/", 
                              names(consensus_peaks)[i], 
                              "_consensus_peaks.bed"))
 }
