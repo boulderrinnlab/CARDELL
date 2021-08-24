@@ -1,0 +1,47 @@
+---
+title: "00_design_file_rnaseq"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+options(stringsAsFactors = F)
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(janitor)
+library(httr)
+```
+
+```{r}
+geo_data <- read.table("/scratch/Shares/rinn/isabela/CARDELL/analysis/00_design_file/filereport_read_run_PRJNA338181_tsv.txt",
+                       sep = "\t", header = T)
+geo_data$fastq_ftp1 <- gsub(";(.*)", "", geo_data$fastq_ftp)
+geo_data$fastq_ftp2 <- gsub("(.*);", "", geo_data$fastq_ftp)
+
+geo_data$fastq_file_1 <- gsub("(.*)/SRR4011*", "SRR4011", geo_data$fastq_ftp1)
+geo_data$fastq_file_2 <- gsub("(.*)/SRR4011*", "SRR4011", geo_data$fastq_ftp2)
+
+geo_data$fastq_1 <- paste0("../data/rnaseq_fastq/", geo_data$fastq_file_1)
+geo_data$fastq_2 <- paste0("../data/rnaseq_fastq/", geo_data$fastq_file_2)
+
+geo_data$sample <- gsub("_RNA-seq", "", geo_data$sample)
+
+design_rnaseq <- geo_data %>%
+  dplyr::select(sample, fastq_1, fastq_2)
+
+#write_csv(design_rnaseq, "design_rnaseq.csv")
+
+#including polysome data
+
+polysome <- read_csv("/scratch/Shares/rinn/isabela/CARDELL/data/rnaseq_fastq/RNAseq_polysomes_Isabela.csv")
+
+polysome$fastq_2 <- ""
+
+design_final <- rbind(design_rnaseq, polysome)
+
+#it's only missing the column strandedness
+
+write_csv(design_final, "design_rnaseq.csv")
+
+
+```
+

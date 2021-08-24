@@ -18,7 +18,7 @@ https://www.ebi.ac.uk/ena/browser/view/PRJNA338181?show=reads
 #Creating a .txt file to batch download fastq from GEO/SRA/ENA
 #First, get the report.tsv from ENA website with all the info
 
-geo_data <- read.table("filereport_read_run_PRJNA338181_tsv.txt",
+geo_data <- read.table("/scratch/Shares/rinn/isabela/CARDELL/analysis/00_design_file/filereport_read_run_PRJNA338181_tsv.txt",
                        sep = "\t", header = T)
 
 geo_data$fastq_ftp1 <- gsub(";(.*)", "", geo_data$fastq_ftp)
@@ -76,6 +76,8 @@ names(md5_2)[names(md5_2) == "fastq_md5_2"] <- "md5"
 md5 <- rbind(md5_1, md5_2)
 
 write.table(md5, "md5.txt", sep = "  ", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+write_csv(geo_data, "geo_data_input.csv")
 ```
 
 ```{bash}
