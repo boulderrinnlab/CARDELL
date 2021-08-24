@@ -1,0 +1,85 @@
+---
+title: "00_aquiring_data_GEO"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+#Retrieve data from:
+https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE85331
+https://www.ebi.ac.uk/ena/browser/view/PRJNA338181?show=reads
+
+```{r}
+
+#Creating a .txt file to batch download fastq from GEO/SRA/ENA
+#First, get the report.tsv from ENA website with all the info
+
+geo_data <- read.table("filereport_read_run_PRJNA338181_tsv.txt",
+                       sep = "\t", header = T)
+
+geo_data$fastq_ftp1 <- gsub(";(.*)", "", geo_data$fastq_ftp)
+geo_data$fastq_ftp2 <- gsub("(.*);", "", geo_data$fastq_ftp)
+
+geo_data$fastq_ftp1 <- paste0("ftp://", geo_data$fastq_ftp1)
+geo_data$fastq_ftp2 <- paste0("ftp://", geo_data$fastq_ftp2)
+
+#write_csv(geo_data, "geo_data.csv")
+
+ftp1 <- geo_data %>%
+  dplyr::select(fastq_ftp1) 
+names(ftp1)[names(ftp1) == "fastq_ftp1"] <- "ftp_fastq"
+
+ftp2 <- geo_data %>%
+  dplyr::select(fastq_ftp2)
+names(ftp2)[names(ftp2) == "fastq_ftp2"] <- "ftp_fastq"
+
+ftp_download <- rbind(ftp1, ftp2)
+
+write.table(ftp_download, "ftp_download.txt", row.names = F, col.names = F, quote = F)
+
+
+```
+
+```{bash}
+
+#batch download all fastq files using wget
+#open screen
+screen
+
+wget -i ftp_download.txt
+```
+
+```{r}
+#checking md5sum
+
+geo_data$fastq_1 <- gsub("(.*)/SRR4011*", "SRR4011", geo_data$fastq_ftp1)
+geo_data$fastq_2 <- gsub("(.*)/SRR4011*", "SRR4011", geo_data$fastq_ftp2)
+#ftp_download$fastq <- gsub("(.*)/SRR4011*", "SRR4011", ftp_download$ftp_fastq)
+
+geo_data$fastq_md5_1 <- gsub(";(.*)", "", geo_data$fastq_md5)
+geo_data$fastq_md5_2 <- gsub("(.*);", "", geo_data$fastq_md5)
+
+md5_1 <- geo_data %>%
+  dplyr::select(fastq_md5_1,fastq_1) 
+names(md5_1)[names(md5_1) == "fastq_1"] <- "fastq"
+names(md5_1)[names(md5_1) == "fastq_md5_1"] <- "md5"
+
+md5_2 <- geo_data %>%
+  dplyr::select(fastq_md5_2,fastq_2) 
+names(md5_2)[names(md5_2) == "fastq_2"] <- "fastq"
+names(md5_2)[names(md5_2) == "fastq_md5_2"] <- "md5"
+
+md5 <- rbind(md5_1, md5_2)
+
+write.table(md5, "md5.txt", sep = "  ", quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+```{bash}
+md5sum -c md5.txt 
+#To output do the following in the directory with files to be tested
+md5sum -c md5.txt > md5_status.txt
+```
