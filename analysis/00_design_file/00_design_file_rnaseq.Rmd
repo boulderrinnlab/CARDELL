@@ -28,20 +28,30 @@ geo_data$sample <- gsub("_RNA-seq", "", geo_data$sample)
 design_rnaseq <- geo_data %>%
   dplyr::select(sample, fastq_1, fastq_2)
 
+design_rnaseq$strandedness <- "forward" 
+
 #write_csv(design_rnaseq, "design_rnaseq.csv")
 
 #including polysome data
 
 polysome <- read_csv("/scratch/Shares/rinn/isabela/CARDELL/data/rnaseq_fastq/RNAseq_polysomes_Isabela.csv")
 
+polysome$fastq_1 <- paste0("../data/rnaseq_fastq/", polysome$fastq_1)
 polysome$fastq_2 <- ""
+polysome$strandedness <- "reverse"
 
 design_final <- rbind(design_rnaseq, polysome)
 
-#it's only missing the column strandedness
+#check column strandedness
 
 write_csv(design_final, "design_rnaseq.csv")
 
+
+
+#/scratch/Shares/rinn/genomes/Homo_sapiens/Gencode/v38/GRCh38.primary_assembly.genome.fa
+#/scratch/Shares/rinn/genomes/Homo_sapiens/Gencode/v38/gencode.v38.annotation.gtf
+#version 3.4
+#23h
 
 ```
 

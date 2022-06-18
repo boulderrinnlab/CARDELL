@@ -1,0 +1,124 @@
+---
+title: "rnaseq_analysis"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(DESeq2)
+library(VennDiagram)
+library(ggdendro)
+library(GenomicRanges)
+```
+
+
+```{r - read in files}
+#D10 vs D10 dox
+deg10 <- read.csv("/scratch/Shares/rinn/isabela/CARDELL/rnaseq/resultadosDEtotalnorm_10P10Pdox_excel.csv")
+
+#D15 vs D15dox
+deg15 <- read.csv("/scratch/Shares/rinn/isabela/CARDELL/rnaseq/resultadosDEtotalnorm_15P15Pdox_excel.csv")
+
+#D10 vs D15
+deg_dif <- read.csv("/scratch/Shares/rinn/isabela/CARDELL/rnaseq/resultadosDEtotalnorm_10P15P_excel.csv")
+
+#D10dox vs D15dox
+deg_dox <- read.csv("/scratch/Shares/rinn/isabela/CARDELL/rnaseq/resultadosDEtotalnorm_10Pdox15Pdox_excel.csv")
+```
+
+```{r - apply filter for DEGs}
+### Filter by FDR 0.05 and logFC 1.5
+
+deg10_up <- deg10 %>%
+  filter(padj <= 0.05 & log2FoldChange <= -1.5)
+write_csv(deg10_up, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/deg10_up.csv")
+
+deg10_down <- deg10 %>%
+  filter(padj <= 0.05 & log2FoldChange >= 1.5)
+write_csv(deg10_down, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/deg10_down.csv")
+
+##
+
+deg15_up <- deg15 %>%
+  filter(padj <= 0.05 & log2FoldChange <= -1.5)
+write_csv(deg15_up, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/deg15_up.csv")
+
+deg15_down <- deg15 %>%
+  filter(padj <= 0.05 & log2FoldChange >= 1.5)
+write_csv(deg15_down, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/deg15_down.csv")
+
+##
+
+deg_dif_up <- deg_dif %>%
+  filter(padj <= 0.05 & log2FoldChange <= -1.5)
+write_csv(deg_dif_up, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/deg_dif_up.csv")
+
+deg_dif_down <- deg_dif %>%
+  filter(padj <= 0.05 & log2FoldChange >= 1.5)
+write_csv(deg_dif_down, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/deg_dif_down.csv")
+
+##
+
+deg_dox_up <- deg_dox %>%
+  filter(padj <= 0.05 & log2FoldChange <= -1.5)
+write_csv(deg_dox_up, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/deg_dox_up.csv")
+
+deg_dox_down <- deg_dox %>%
+  filter(padj <= 0.05 & log2FoldChange >= 1.5)
+write_csv(deg_dox_down, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/deg_dox_down.csv")
+
+```
+
+```{r - how much CARDEL affect overall dif}
+#Compare if what changes between D10 and D15 in regular diff is the same as with dox
+#UP: 914 & 1086
+cardel_effect_overall <- intersect(deg_dif_up$Row.names, deg_dox_up$Row.names)
+#537
+
+#DOWN: 364 & 351
+cardel_effect_overall_d <- intersect(deg_dif_down$Row.names, deg_dox_down$Row.names)
+#122
+
+##TODO: most of genes not similar - what are they and how they express??
+
+```
+
+```{r - D10dox is more similar to D15?}
+#What CARDEL helps to express earlier in D10?
+#Compare D10xD15 to D10xD10dox
+#UP: 914 & 195
+intersection <- intersect(deg_dif_up$Row.names, deg10_up$Row.names)
+#34
+intersection <- as.data.frame(intersection)
+colnames(intersection) <- c("Row.names")
+intersection <- intersection %>% left_join(deg_dif_up)
+genes <- intersection %>% select(external_gene_name)
+write.csv(genes,"/scratch/Shares/rinn/isabela/CARDELL/rnaseq/genes.csv")
+
+#GO gprofiler: metal ion transport for the 34 genes
+```
+
+
+```{r - template####}
+pdf("/scratch/Shares/rinn/isabela/rna_protein_complexes/analysis/00_mESC_grad/analysis/01_general_properties/results/ven_genes_filtered_tpm_old_newdata.pdf")
+
+venn_plot <- draw.pairwise.venn(length(genes_old$gene_id),
+                                length(filter_both$gene_id),
+                                length(gene_intersect$gene_intersect),
+                                category = c("Cody","Isabela"),
+                                scaled=TRUE,
+                                fill = c("dark gray", "red"),
+                                alpha = rep(0.5,2),
+                                cat.pos = c(-30,30),
+                                lty = "blank",
+                                cex = 2,
+                                ext.text = TRUE,
+                                cat.dist = c(0.03, 0.03),
+                                cat.cex = 2)
+dev.off()
+```
+
