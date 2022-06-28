@@ -13,6 +13,7 @@ library(DESeq2)
 library(VennDiagram)
 library(ggdendro)
 library(GenomicRanges)
+source("/scratch/Shares/rinn/isabela/rna_protein_complexes/analysis/util/_plot_theme.R")
 ```
 
 
@@ -79,6 +80,27 @@ write_csv(deg_dox_down, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/deg_dox_dow
 cardel_effect_overall <- intersect(deg_dif_up$Row.names, deg_dox_up$Row.names)
 #537
 
+#find what don't intersect
+deg_dox_up$only_dox <- ifelse(deg_dox_up$Row.names %in% deg_dif_up$Row.names, "TRUE", "dox")
+only_dox <- deg_dox_up %>%
+  filter(only_dox == "dox") #549
+write_csv(only_dox, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/only_dox.csv")
+
+common_dif <- deg_dox_up %>%
+  filter(only_dox == "TRUE") #537
+write_csv(common_dif, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/common_dif.csv")
+
+#Let's see how much the only_dox intersect with D15 x D15dox
+#549 & 393
+intersect2 <- intersect(only_dox$Row.names, deg15_up$Row.names)
+#147
+
+only_dox$D15 <- ifelse(only_dox$Row.names %in% deg15_up$Row.names, "common", "not")
+only_dox_D15 <- only_dox %>%
+  filter(D15 == "not") 
+#402 genes that CARDEL also helps up-express between D10 and D15 that didn't show up in the D15 comparison
+write_csv(only_dox_D15, "/scratch/Shares/rinn/isabela/CARDELL/rnaseq/only_dox_D15_not.csv")
+
 #DOWN: 364 & 351
 cardel_effect_overall_d <- intersect(deg_dif_down$Row.names, deg_dox_down$Row.names)
 #122
@@ -122,3 +144,23 @@ venn_plot <- draw.pairwise.venn(length(genes_old$gene_id),
 dev.off()
 ```
 
+```{r - clustering}
+#make a file with norm_counts (#TODO: ask WHAT ARE THESE NUMBERS!!!!!!)
+norm_counts <- deg10 %>%
+  select(Row.names, starts_with("X")) %>%
+  select(!X)
+
+norm_counts <- distinct(norm_counts)
+
+norm_counts <- norm_counts %>%
+  column_to_rownames(var = "Row.names")
+
+#scale to plot
+norm_counts_scaled <- t(scale(t(norm_counts))) 
+
+pheatmap::pheatmap(norm_counts_scaled, show_rownames = FALSE, 
+                   cluster_rows = F, cluster_cols = T,
+                   breaks = seq(-3, 3, length.out = length(col_pal10)),
+                   color = col_pal10, border_color = NA, fontsize_row = 8)
+```
+#TODO: cluster with a cardiac specific list of genes (maybe d10dox up??)
